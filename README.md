@@ -1,4 +1,4 @@
 pyrrhus
 =======
 
-Phyrrus of Epirus
+Pyrrhus of Epirus
