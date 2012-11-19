@@ -45,7 +45,7 @@ def TModule(p):
 
 @T
 def TFunctionDef(p):
-  args_str = ','.join([x.id for x in p.args.args])
+  args_str = ','.join(['%s Any' % x.id for x in p.args.args])
   print 'func %s(%s) Any {' % (p.name, args_str)
   DoBody(p.body)
   print '}  // func %s' % (p.name, )
@@ -69,7 +69,7 @@ def TReturn(p):
 @V
 def VCall(p):
   aa = ','.join([x.Value() for x in p.args]) if p.args else ''
-  return '( %s ( %s ))' % (p.func, aa)
+  return '( %s ( %s ))' % (p.func.id, aa)
 
 @V
 def VNum(p):
