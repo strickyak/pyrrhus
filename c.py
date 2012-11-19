@@ -8,16 +8,14 @@ import sys
 def NodeStringer(n):
   return n.__class__.__name__ + '~' + str(n.nom)
 
-# def Dir(n):
-#   return ','.join([x for x in dir(n) if not re.match('^__', x)])
-
 class T(object):
   "Decorate a Patched Trans Method"
   def __init__(self, f):
     name = f.__name__[1:]
     cls = vars(ast)[name]
     cls.Trans = f
-  def __call__(self): pass
+  def __call__(self):
+    pass
 
 class V(object):
   "Decorate a Patched Value Method"
@@ -25,46 +23,19 @@ class V(object):
     name = f.__name__[1:]
     cls = vars(ast)[name]
     cls.Value = f
-  def __call__(self): pass
+  def __call__(self):
+    pass
 
 @V
 def VBinOp(p):
-  op = p.op
-
-  if type(op) is ast.Add:
-    opStr = '+'
-  elif type(op) is ast.Sub:
-    opStr = '-'
-  elif type(op) is ast.Div:
-    opStr = '/'
-  elif type(op) is ast.Mult:
-    opStr = '*'
-  elif type(op) is ast.Mod:
-    opStr = '%'
-
-  return "BinOp%s(%s, %s)" % (op.__class__.__name__, p.left.Value(), p.right.Value())
-  return "((%s.(Any).(int)) %s (%s.(Any).(int)))" % (p.left.Value(), opStr, p.right.Value())
+  return "BinOp%s(%s, %s)" % (p.op.__class__.__name__, p.left.Value(), p.right.Value())
 
 @V
 def VCompare(p):
-  op = p.ops[0]
-  if type(op) is ast.LtE:
-    opStr = '<='
-  elif type(op) is ast.Lt:
-    opStr = '<'
-  elif type(op) is ast.Gt:
-    opStr = '>'
-  elif type(op) is ast.GtE:
-    opStr = '>='
-  elif type(op) is ast.Eq:
-    opStr = '=='
-  elif type(op) is ast.NotEq:
-    opStr = '!='
-
-  return "Compare%s(%s, %s)" % (op.__class__.__name__, p.left.Value(), p.comparators[0].Value())
-  return "((%s).(Any).(int) %s (%s).(Any).(int))" % (p.left.Value(), opStr, p.comparators[0].Value())
+  return "Compare%s(%s, %s)" % (p.ops[0].__class__.__name__, p.left.Value(), p.comparators[0].Value())
 
 def DoBody(body):
+  print "//--- body len is %d, body=%s" % (len(body), body)
   for x in body:
     x.Trans()
 
@@ -81,7 +52,7 @@ def TFunctionDef(p):
 
 @T
 def TIf(p):
-  print 'if %s {' % p.test.Value()
+  print 'if (%s).(bool) {' % p.test.Value()
   DoBody(p.body)
   if p.orelse:
     pass # TODO
@@ -107,10 +78,9 @@ def VNum(p):
 @T
 def TPrint(p):
   for x in p.values:
-    print 'func init() { print (%s); }' % x.Value()
+    print 'func init() { print(PrintableValue(%s)); }' % x.Value()
   if p.nl:
     print 'func init() { println(); }'
-ast.Print.Trans = TPrint
 
 @V
 def VName(p):
@@ -134,7 +104,6 @@ def Translate(filename):
     print
 
   print 'package main'
-  print 'type Any interface{}'
   a.Trans()
   print 'func main() { println("OK"); }'
 
