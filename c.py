@@ -20,11 +20,24 @@ class T(object):
     cls = vars(ast)[name]
     print '////@ cls=', cls
     cls.Trans = self.f
+  def __call__(self): pass
 
+class V(object):
+  def __init__(self, f):
+    self.f = f
+    print '////@ f=', f
+    name = self.f.__name__[1:]
+    print '////@ name=', name
+    cls = vars(ast)[name]
+    print '////@ cls=', cls
+    cls.Value = self.f
+  def __call__(self): pass
+
+@T
 def TModule(p):
   for x in p.body:
     x.Trans()
-ast.Module.Trans = TModule
+# ast.Module.Trans = TModule
 
 @T
 def TFunctionDef(p):
@@ -34,14 +47,15 @@ def TFunctionDef(p):
     x.Trans()
   print '}  // func %s' % (p.name, )
 
+@T
 def TAssign(p):
   print 'var %s = %s;' % (p.targets[0].id, p.value.Value())
-ast.Assign.Trans = TAssign
 
 def VNum(p):
   return str(p.n)
 ast.Num.Value = VNum
 
+@T
 def TPrint(p):
   for x in p.values:
     print 'func init() { print (%s); }' % x.Value()
@@ -49,13 +63,13 @@ def TPrint(p):
     print 'func init() { println(); }'
 ast.Print.Trans = TPrint
 
+@V
 def VBinOp(p):
   return "((%s) %s (%s))" % (p.left.Value(), '+', p.right.Value())
-ast.BinOp.Value = VBinOp
 
+@V
 def VName(p):
   return p.id
-ast.Name.Value = VName
   
 def Translate(filename):
   a = ast.parse(open(filename).read())
