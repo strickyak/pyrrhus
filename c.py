@@ -11,10 +11,28 @@ def NodeStringer(n):
 # def Dir(n):
 #   return ','.join([x for x in dir(n) if not re.match('^__', x)])
 
+class T(object):
+  def __init__(self, f):
+    self.f = f
+    print '////@ f=', f
+    name = self.f.__name__[1:]
+    print '////@ name=', name
+    cls = vars(ast)[name]
+    print '////@ cls=', cls
+    cls.Trans = self.f
+
 def TModule(p):
   for x in p.body:
     x.Trans()
 ast.Module.Trans = TModule
+
+@T
+def TFunctionDef(p):
+  args_str = ','.join([x.id for x in p.args.args])
+  print 'func %s(%s) Any {' % (p.name, args_str)
+  for x in p.body:
+    x.Trans()
+  print '}  // func %s' % (p.name, )
 
 def TAssign(p):
   print 'var %s = %s;' % (p.targets[0].id, p.value.Value())
