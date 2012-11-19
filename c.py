@@ -27,13 +27,41 @@ class V(object):
     cls.Value = f
   def __call__(self): pass
 
-@V # REPLACE RYAN
-def VCompare(p):
-  return "0 /*ryan*/"
-@V # REPLACE RYAN
+@V
 def VBinOp(p):
-  return "((%s) %s (%s) /*ryan*/)" % (p.left.Value(), '+', p.right.Value())
+  return "((%s) %s (%s))" % (p.left.Value(), '+', p.right.Value())
+  op = p.op
 
+  if type(op) is ast.Add:
+    opStr = '+'
+  elif type(op) is ast.Sub:
+    opStr = '-'
+  elif type(op) is ast.Div:
+    opStr = '/'
+  elif type(op) is ast.Mult:
+    opStr = '*'
+  elif type(op) is ast.Mod:
+    opStr = '%'
+
+  return "((%s) %s (%s))" % (p.left.Value(), opStr, p.right.Value())
+
+@V
+def VCompare(p):
+  op = p.ops[0]
+  if type(op) is ast.LtE:
+    opStr = '<='
+  elif type(op) is ast.Lt:
+    opStr = '<'
+  elif type(op) is ast.Gt:
+    opStr = '>'
+  elif type(op) is ast.GtE:
+    opStr = '>='
+  elif type(op) is ast.Eq:
+    opStr = '=='
+  elif type(op) is ast.NotEq:
+    opStr = '!='
+
+  return "((%s) %s (%s))" % (p.left.Value(), opStr, p.comparators[0].Value())
 
 def DoBody(body):
   for x in body:
