@@ -27,6 +27,14 @@ class V(object):
     cls.Value = f
   def __call__(self): pass
 
+@V # REPLACE RYAN
+def VCompare(p):
+  return "0 /*ryan*/"
+@V # REPLACE RYAN
+def VBinOp(p):
+  return "((%s) %s (%s) /*ryan*/)" % (p.left.Value(), '+', p.right.Value())
+
+
 def DoBody(body):
   for x in body:
     x.Trans()
@@ -52,11 +60,20 @@ def TIf(p):
 
 @T
 def TAssign(p):
-  print 'var %s = %s;' % (p.targets[0].id, p.value.Value())
+  print 'var %s = %s' % (p.targets[0].id, p.value.Value())
 
+@T
+def TReturn(p):
+  print 'return %s' % p.value.Value()
+
+@V
+def VCall(p):
+  aa = ','.join([x.Value() for x in p.args]) if p.args else ''
+  return '( %s ( %s ))' % (p.func, aa)
+
+@V
 def VNum(p):
   return str(p.n)
-ast.Num.Value = VNum
 
 @T
 def TPrint(p):
@@ -65,10 +82,6 @@ def TPrint(p):
   if p.nl:
     print 'func init() { println(); }'
 ast.Print.Trans = TPrint
-
-@V
-def VBinOp(p):
-  return "((%s) %s (%s))" % (p.left.Value(), '+', p.right.Value())
 
 @V
 def VName(p):
