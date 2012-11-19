@@ -29,7 +29,6 @@ class V(object):
 
 @V
 def VBinOp(p):
-  return "((%s) %s (%s))" % (p.left.Value(), '+', p.right.Value())
   op = p.op
 
   if type(op) is ast.Add:
@@ -43,7 +42,8 @@ def VBinOp(p):
   elif type(op) is ast.Mod:
     opStr = '%'
 
-  return "((%s) %s (%s))" % (p.left.Value(), opStr, p.right.Value())
+  return "BinOp%s(%s, %s)" % (op.__class__.__name__, p.left.Value(), p.right.Value())
+  return "((%s.(Any).(int)) %s (%s.(Any).(int)))" % (p.left.Value(), opStr, p.right.Value())
 
 @V
 def VCompare(p):
@@ -61,7 +61,8 @@ def VCompare(p):
   elif type(op) is ast.NotEq:
     opStr = '!='
 
-  return "((%s) %s (%s))" % (p.left.Value(), opStr, p.comparators[0].Value())
+  return "Compare%s(%s, %s)" % (op.__class__.__name__, p.left.Value(), p.comparators[0].Value())
+  return "((%s).(Any).(int) %s (%s).(Any).(int))" % (p.left.Value(), opStr, p.comparators[0].Value())
 
 def DoBody(body):
   for x in body:
@@ -133,6 +134,7 @@ def Translate(filename):
     print
 
   print 'package main'
+  print 'type Any interface{}'
   a.Trans()
   print 'func main() { println("OK"); }'
 
