@@ -12,40 +12,43 @@ def NodeStringer(n):
 #   return ','.join([x for x in dir(n) if not re.match('^__', x)])
 
 class T(object):
+  "Decorate a Patched Trans Method"
   def __init__(self, f):
-    self.f = f
-    print '////@ f=', f
-    name = self.f.__name__[1:]
-    print '////@ name=', name
+    name = f.__name__[1:]
     cls = vars(ast)[name]
-    print '////@ cls=', cls
-    cls.Trans = self.f
+    cls.Trans = f
   def __call__(self): pass
 
 class V(object):
+  "Decorate a Patched Value Method"
   def __init__(self, f):
-    self.f = f
-    print '////@ f=', f
-    name = self.f.__name__[1:]
-    print '////@ name=', name
+    name = f.__name__[1:]
     cls = vars(ast)[name]
-    print '////@ cls=', cls
-    cls.Value = self.f
+    cls.Value = f
   def __call__(self): pass
+
+def DoBody(body):
+  for x in body:
+    x.Trans()
 
 @T
 def TModule(p):
-  for x in p.body:
-    x.Trans()
-# ast.Module.Trans = TModule
+  DoBody(p.body)
 
 @T
 def TFunctionDef(p):
   args_str = ','.join([x.id for x in p.args.args])
   print 'func %s(%s) Any {' % (p.name, args_str)
-  for x in p.body:
-    x.Trans()
+  DoBody(p.body)
   print '}  // func %s' % (p.name, )
+
+@T
+def TIf(p):
+  print 'if %s {' % p.test.Value()
+  DoBody(p.body)
+  if p.orelse:
+    pass # TODO
+  print '}'
 
 @T
 def TAssign(p):
