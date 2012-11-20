@@ -34,6 +34,16 @@ def VBinOp(p):
 def VCompare(p):
   return "Compare%s(%s, %s)" % (p.ops[0].__class__.__name__, p.left.Value(), p.comparators[0].Value())
 
+@V
+def VSubscript(p):
+  return "%s%s" % (p.value.Value(), p.slice.Value())
+
+@V
+def VSlice(p):
+  lower = p.lower.Value() if p.lower is not None else ""
+  upper = p.upper.Value() if p.upper is not None else ""
+  return "[%s:%s]" % (lower, upper)
+
 def DoBody(body):
   print "//--- body len is %d, body=%s" % (len(body), body)
   for x in body:
@@ -75,6 +85,10 @@ def VCall(p):
 def VNum(p):
   return str(p.n)
 
+@V
+def VStr(p):
+  return "`%s`" % (p.s)
+
 @T
 def TPrint(p):
   for x in p.values:
@@ -85,7 +99,7 @@ def TPrint(p):
 @V
 def VName(p):
   return p.id
-  
+
 def Translate(filename):
   a = ast.parse(open(filename).read())
   i = 1
