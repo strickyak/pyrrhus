@@ -1,6 +1,15 @@
 package main
 
 import "fmt"
+import "go/build"
+
+func DumpBuildInfo() {
+  fmt.Printf("Default Build Context: %#v", build.Default)
+}
+
+func init() {
+  DumpBuildInfo()
+}
 
 type Any interface{}
 
