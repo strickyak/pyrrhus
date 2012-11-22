@@ -5,6 +5,8 @@ import ast
 import re
 import sys
 
+Imports = {}
+
 def NodeStringer(n):
   return n.__class__.__name__ + '~' + str(n.nom)
 
@@ -99,6 +101,24 @@ def TPrint(p):
 @V
 def VName(p):
   return p.id
+
+@T
+def TImport(p):
+  for x in p.names:
+    targ = x.name
+    alias = x.asname if x.asname else x.name
+    Imports[alias] = targ
+    print 'import %s "%s"' % (alias, '/'.join(targ.split('.')))
+
+
+@T
+def TImportFrom(p):
+  for x in p.names:
+    targ = '%s.%s' % (p.module, x.name)
+    alias = x.asname if x.asname else x.name
+    Imports[alias] = targ
+    print 'import %s "%s"' % (alias, '/'.join(targ.split('.')))
+
 
 def Translate(filename):
   a = ast.parse(open(filename).read())
