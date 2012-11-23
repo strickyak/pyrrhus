@@ -6,6 +6,7 @@ import re
 import sys
 
 Imports = {}
+Frames = []
 
 def NodeStringer(n):
   return n.__class__.__name__ + '~' + str(n.nom)
@@ -28,28 +29,50 @@ class V(object):
   def __call__(self):
     pass
 
+OpNames = {
+
+  'Add': 'Xadd',
+  'Sub': 'Xsub',
+  'Mult': 'Xmul',
+  'Div': 'Xdiv',
+  'Mod': 'Xmod',
+  
+  'Gt': 'Xgt',
+  'GtE': 'Xge',
+  'Lt': 'Xlt',
+  'LtE': 'Xle',
+  'Eq': 'Xeq',
+  'NotEq': 'Xne',
+}
+
 @V
 def VBinOp(p):
-  return "BinOp%s(%s, %s)" % (p.op.__class__.__name__, p.left.Value(), p.right.Value())
+  return "(%s).%s(%s)" % (p.left.Value(), OpNames[p.op.__class__.__name__], p.right.Value())
 
 @V
 def VCompare(p):
-  return "Compare%s(%s, %s)" % (p.ops[0].__class__.__name__, p.left.Value(), p.comparators[0].Value())
+  # TODO:  double compare ops.
+  if len(p.ops) != 1: raise Exception('only simple compare supported: ' + str(p))
+  return "Pobj((%s).%s(%s))" % (p.left.Value(), OpNames[p.ops[0].__class__.__name__], p.comparators[0].Value())
 
 @V
 def VSubscript(p):
-  return "%s%s" % (p.value.Value(), p.slice.Value())
+  return "%s[%s]" % (p.value.Value(), p.slice.Value())
 
 @V
 def VSlice(p):
   lower = p.lower.Value() if p.lower is not None else ""
   upper = p.upper.Value() if p.upper is not None else ""
+  # TODO: negative slices.
   return "[%s:%s]" % (lower, upper)
 
 def DoBody(body):
   print "//--- body len is %d, body=%s" % (len(body), body)
+  i = 0
   for x in body:
+    print "//-------- DOING ", i, ';', ast.dump(x)
     x.Trans()
+    i += 1
 
 @T
 def TModule(p):
@@ -57,14 +80,21 @@ def TModule(p):
 
 @T
 def TFunctionDef(p):
-  args_str = ','.join(['%s Any' % x.id for x in p.args.args])
-  print 'func %s(%s) Any {' % (p.name, args_str)
-  DoBody(p.body)
-  print '}  // func %s' % (p.name, )
+  global Frames
+  Frames.append([x.id for x in p.args.args])
+  try:
+    args_str = ','.join(['v_%s Pobj' % x.id for x in p.args.args])
+    print ''
+    print 'func G_%s(%s) Pobj {' % (p.name, args_str)
+    DoBody(p.body)
+    print '}  // end func %s' % p.name
+    print ''
+  finally:
+    Frames = Frames[:-1]
 
 @T
 def TIf(p):
-  print 'if (%s).(bool) {' % p.test.Value()
+  print 'if (%s).Bool() {' % p.test.Value()
   DoBody(p.body)
   if p.orelse:
     pass # TODO
@@ -72,7 +102,7 @@ def TIf(p):
 
 @T
 def TAssign(p):
-  print 'var %s = %s' % (p.targets[0].id, p.value.Value())
+  print 'var G_%s = %s' % (p.targets[0].id, p.value.Value())
 
 @T
 def TReturn(p):
@@ -81,26 +111,42 @@ def TReturn(p):
 @V
 def VCall(p):
   aa = ','.join([x.Value() for x in p.args]) if p.args else ''
-  return '( %s ( %s ))' % (p.func.id, aa)
+  return '( %s ( %s ))' % (p.func.Value(), aa)
 
 @V
 def VNum(p):
-  return str(p.n)
+  return 'Pint(%d)' % p.n  # TODO: Pfloat, Plong.
 
 @V
 def VStr(p):
-  return "`%s`" % (p.s)
+  return "Pstr(`%s`)" % (p.s)  # TODO: handle ` inside literal string.
 
 @T
 def TPrint(p):
   for x in p.values:
-    print 'func init() { print(PrintableValue(%s)); }' % x.Value()
+    print 'func init() { print((%s).String()); }' % x.Value()
   if p.nl:
     print 'func init() { println(); }'
 
+@T
+def TExpr(p):
+  print p.value.Value()
+
+@V
+def VAttribute(p):
+  return '(%s).%s' % (p.value.Value(), p.attr)
+
+@V
+def VIndex(p):
+  return p.value.Value()
+
 @V
 def VName(p):
-  return p.id
+  for f in Frames:
+    for v in f:
+      if p.id == v:
+        return 'v_' + p.id
+  return 'G_' + p.id
 
 @T
 def TImport(p):

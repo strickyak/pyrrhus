@@ -1,4 +1,4 @@
-all: t1 t2 t3
+all: t1 t2 t3 t4 t5
 
 t1 : t1.go
 	go build t1.go runtime.go
@@ -17,6 +17,18 @@ t3 : t3.go
 	./t3
 t3.go : t3.py
 	python c.py t3.py > t3.go || { mv t3.go t3.bad ; false ; }
+
+t4 : t4.go
+	go build t4.go runtime.go
+	./t4
+t4.go : t4.py
+	python c.py t4.py > t4.go || { mv t4.go t4.bad ; false ; }
+
+t5 : t5.go
+	go build t5.go runtime.go
+	./t5
+t5.go : t5.py
+	python c.py t5.py > t5.go || { mv t5.go t5.bad ; false ; }
 
 clean:
 	rm -f t*[0-9].go t*[0-9] t*[0-9].bad
