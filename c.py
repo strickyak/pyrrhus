@@ -64,7 +64,7 @@ def VSlice(p):
   lower = p.lower.Value() if p.lower is not None else ""
   upper = p.upper.Value() if p.upper is not None else ""
   # TODO: negative slices.
-  return "[%s:%s]" % (lower, upper)
+  return "%s:%s" % (lower, upper)
 
 def DoBody(body):
   print "//--- body len is %d, body=%s" % (len(body), body)
@@ -134,7 +134,11 @@ def TExpr(p):
 
 @V
 def VAttribute(p):
-  return '(%s).%s' % (p.value.Value(), p.attr)
+  if p.value.__class__ is ast.Name:
+    # Cannot have parens around import symbol.
+    return '%s.%s' % (p.value.Value(), p.attr)
+  else:
+    return '(%s).%s' % (p.value.Value(), p.attr)
 
 @V
 def VIndex(p):
@@ -142,11 +146,14 @@ def VIndex(p):
 
 @V
 def VName(p):
+  id = p.id
   for f in Frames:
     for v in f:
-      if p.id == v:
-        return 'v_' + p.id
-  return 'G_' + p.id
+      if id == v:
+        return 'v_' + id
+  if Imports.get(id):
+    return 'p_' + id
+  return 'G_' + id
 
 @T
 def TImport(p):
@@ -154,7 +161,7 @@ def TImport(p):
     targ = x.name
     alias = x.asname if x.asname else x.name
     Imports[alias] = targ
-    print 'import %s "%s"' % (alias, '/'.join(targ.split('.')))
+    print 'import p_%s "%s"' % (alias, '/'.join(targ.split('.')))
 
 
 @T
@@ -163,7 +170,7 @@ def TImportFrom(p):
     targ = '%s.%s' % (p.module, x.name)
     alias = x.asname if x.asname else x.name
     Imports[alias] = targ
-    print 'import %s "%s"' % (alias, '/'.join(targ.split('.')))
+    print 'import p_%s "%s"' % (alias, '/'.join(targ.split('.')))
 
 
 def Translate(filename):
