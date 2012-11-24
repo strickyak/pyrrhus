@@ -109,15 +109,44 @@ func GrokDir(dir string) {
       fmt.Printf("fk %#v\n", fk);
       // fmt.Printf("fv %#v\n", fv);
       for i, dcl := range fv.Decls {
-        fmt.Printf("DECL #%d == %#v\n", i, dcl);
 
-	switch x := dcl.zzzzzzzzzzzzzzzzzzzzzzzzz
-        
-        if fdcl, ok := dcl.(*ast.FuncDecl), ok {
+	switch x := dcl.(type) {
+	  case (*ast.FuncDecl):
+            fmt.Printf("FUNC #%d == %#v\n", i, x);
+            fmt.Printf("         Type = %s\n", ast.Print(fset, x.Type))
+
+            // retrieve the parameter's type
+	    params := x.Type.Params
+	    for lk, lv := range params.List {
+	      tname := "?"
+	      switch t := lv.Type.(type) {
+	      	case (*ast.Ident):
+		  tname = t.Name
+	      }
+
+	      fmt.Printf("       %d = %s (%s)\n", lk, lv.Names[0].Name, tname)
+	    }
+	  default:
+            fmt.Printf("DECL #%d == %#v\n", i, dcl);
 	}
       }
     }
   }
+}
+
+func typeStr(a interface{}) string {
+  tname := "?"
+
+  switch t := a.(type) {
+  case (*ast.Ident):
+    tname = t.Name
+  case (*ast.ArrayType):
+    tname = "[]" + typeStr(t.Elt)
+  case (*ast.StarExpr):
+    tname = "*" + typeStr(t.X)
+  }
+
+  return tname
 }
 
 func main() {
