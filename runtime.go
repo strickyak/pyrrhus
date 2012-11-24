@@ -3,9 +3,13 @@ package main
 import "fmt"
 import "go/ast"
 import "go/build"
+import "go/parser"
 import "go/token"
-//import "os"
+import "os"
 import "strconv"
+
+var _ = os.Open
+var _ = ast.Walk
 
 /*  [go/ast]
 type Importer func(imports map[string]*Object, path string) (pkg *Object, err error)
@@ -54,6 +58,16 @@ type Package struct {
     XTestImports   []string                    // imports from XTestGoFiles
     XTestImportPos map[string][]token.Position // line information for XTestImports
 }
+
+[parser]
+
+func ParseDir(fset *token.FileSet, path string, filter func(os.FileInfo) bool, mode Mode) (pkgs map[string]*ast.Package, first error)
+
+ParseDir calls ParseFile for the files in the directory specified by path and returns a map of package name -> package AST with all the packages found. If filter != nil, only the files with os.FileInfo entries passing through the filter are considered. The mode bits are passed to ParseFile unchanged. Position information is recorded in the file set fset.
+
+If the directory couldn't be read, a nil map and the respective error are returned. If a parse error occurred, a non-nil but incomplete map and the first error encountered are returned.
+
+
 */
 
 func DumpBuildInfo() {
@@ -64,12 +78,16 @@ func DumpBuildInfo() {
   fmt.Printf("p %#v\n", p);
   
   fset := token.NewFileSet()
-  universe := ast.NewScope(nil)
-  files := make(map[string]*ast.File)
-  // NewPackage(fset *token.FileSet, files map[string]*File, importer Importer, universe *Scope) (*Package, error)
-  pack, err := ast.NewPackage(fset, files, nil, universe)
+  //// universe := ast.NewScope(nil)
+  //// files := make(map[string]*ast.File)
+  //// // NewPackage(fset *token.FileSet, files map[string]*File, importer Importer, universe *Scope) (*Package, error)
+  //// pack, err := ast.NewPackage(fset, files, nil, universe)
+  //// fmt.Printf("err %#v\n", err);
+  //// fmt.Printf("pack %#v\n", pack);
+
+  pkgs, err := parser.ParseDir(fset, "/opt/go/src/pkg/fmt", nil, parser.Mode(0))
   fmt.Printf("err %#v\n", err);
-  fmt.Printf("pack %#v\n", pack);
+  fmt.Printf("pkgs %#v\n", pkgs);
 }
 
 func init() {
