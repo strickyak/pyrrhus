@@ -95,8 +95,12 @@ If the directory couldn't be read, a nil map and the respective error are return
 
 var  fset = token.NewFileSet()
 
+func FilterDotGo(info os.FileInfo) bool {
+  return strings.Contains(info.Name(), ".go")
+}
+
 func GrokDir(dir string) {
-  pkgs, err := parser.ParseDir(fset, dir, nil, parser.Mode(0))
+  pkgs, err := parser.ParseDir(fset, dir, FilterDotGo, parser.Mode(0))
   if err != nil {
     panic(fmt.Sprintf("ERROR <%q> IN DIR <%s>", err, dir))
   }
@@ -112,20 +116,26 @@ func GrokDir(dir string) {
 
 	switch x := dcl.(type) {
 	  case (*ast.FuncDecl):
-            fmt.Printf("FUNC #%d == %#v\n", i, x);
-            fmt.Printf("         Type = %s\n", ast.Print(fset, x.Type))
+            fstr := funcDeclStr(x)
+            fmt.Printf("%s\n", fstr)
 
-            // retrieve the parameter's type
-	    params := x.Type.Params
-	    for lk, lv := range params.List {
-	      tname := "?"
-	      switch t := lv.Type.(type) {
-	      	case (*ast.Ident):
-		  tname = t.Name
-	      }
+            if strings.Contains(fstr, "?") {
+              fmt.Printf("FUNC #%d == %#v\n", i, dcl);
+              fmt.Printf("   Recv: %#v\n", x.Recv)
+	      if x.Recv != nil {
+                for _, elem := range x.Recv.List {
+                  fmt.Printf("      Elem: %#v\n", elem)
+		  for _, rid := range elem.Names {
+                    fmt.Printf("      Name: %#v\n", rid.Name)
+		  }
+                  fmt.Printf("      Type: %#v\n", elem.Type)
+                  fmt.Printf("      ====: %s\n", typeStr(elem.Type))
+                  fmt.Printf("      ====: %s\n", ast.Print(fset, elem.Type))
+                }
+              }
 
-	      fmt.Printf("       %d = %s (%s)\n", lk, lv.Names[0].Name, tname)
-	    }
+              fmt.Printf("  FUNC Type = %s\n", ast.Print(fset, x.Type))
+            }
 	  default:
             fmt.Printf("DECL #%d == %#v\n", i, dcl);
 	}
@@ -135,18 +145,54 @@ func GrokDir(dir string) {
 }
 
 func typeStr(a interface{}) string {
-  tname := "?"
-
   switch t := a.(type) {
   case (*ast.Ident):
-    tname = t.Name
+    return t.Name
   case (*ast.ArrayType):
-    tname = "[]" + typeStr(t.Elt)
+    return "[]" + typeStr(t.Elt)
   case (*ast.StarExpr):
-    tname = "*" + typeStr(t.X)
+    return "*" + typeStr(t.X)
+  case (*ast.Ellipsis):
+    return "@" + typeStr(t.Elt)
+  case (*ast.SelectorExpr):
+    return "{" + typeStr(t.X) + "}." + typeStr(t.Sel)
+  case (*ast.InterfaceType):
+    return "III" /* TODO */
+  case (*ast.Object):
+    return funcDeclStr(t.Decl.(*ast.FuncDecl))
   }
 
-  return tname
+  return "?"
+}
+
+func funcDeclStr(f *ast.FuncDecl) string {
+  fstr := "@"
+  if f.Recv != nil {
+    if len(f.Recv.List) != 1 { panic("f.Recv.List") }
+    fstr += "meth " + typeStr(f.Recv.List[0].Type) + " "
+  } else {
+    fstr += "func "
+  }
+  
+  fstr += f.Name.Name + " ("
+
+  // list of parameters
+  params := f.Type.Params
+  for _, lv := range params.List {
+    pname := lv.Names[0].Name
+    tname := typeStr(lv.Type)
+    fstr +=  pname + " " + tname + ", "
+  }
+
+  // trim the last ", "
+  if fstr[len(fstr) - 2] == ',' {
+    fstr = fstr[0:len(fstr) - 2]
+  }
+
+  // End of parameters
+  fstr += ")"
+             
+  return fstr
 }
 
 func main() {
