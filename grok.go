@@ -96,7 +96,10 @@ If the directory couldn't be read, a nil map and the respective error are return
 var  fset = token.NewFileSet()
 
 func FilterDotGo(info os.FileInfo) bool {
-  return strings.Contains(info.Name(), ".go")
+  s := info.Name()
+  n := len(s)
+  // return strings.Contains(s, ".go")
+  return n>3 && s[n-3]=='.' && s[n-2]=='g' && s[n-1]=='o'
 }
 
 func GrokDir(dir string) {
@@ -158,11 +161,20 @@ func typeStr(a interface{}) string {
     return "{" + typeStr(t.X) + "}." + typeStr(t.Sel)
   case (*ast.InterfaceType):
     return "III" /* TODO */
-  case (*ast.Object):
-    return funcDeclStr(t.Decl.(*ast.FuncDecl))
+  // case (*ast.Object):  // IS THIS USED?
+  //   return funcDeclStr(t.Decl.(*ast.FuncDecl))
+  case (*ast.FuncType):
+    return funcTypeStr(t)
+  case (*ast.MapType):
+    return mapTypeStr(t)
   }
 
   return "?"
+}
+
+func mapTypeStr(t *ast.MapType) string {
+  return "{ MAP: KEY: " + typeStr(t.Key) + " VALUE: " + typeStr(t.Value) + " } "
+  // return "{ MAP: KEY: " + typeStr(t.Key.Obj.Decl) + " VALUE: " + typeStr(t.Value.Obj.Decl) + " } "
 }
 
 func funcDeclStr(f *ast.FuncDecl) string {
@@ -176,23 +188,56 @@ func funcDeclStr(f *ast.FuncDecl) string {
   
   fstr += f.Name.Name + " ("
 
-  // list of parameters
-  params := f.Type.Params
-  for _, lv := range params.List {
-    pname := lv.Names[0].Name
-    tname := typeStr(lv.Type)
-    fstr +=  pname + " " + tname + ", "
-  }
-
-  // trim the last ", "
-  if fstr[len(fstr) - 2] == ',' {
-    fstr = fstr[0:len(fstr) - 2]
-  }
+  fstr += funcTypeStr(f.Type)
 
   // End of parameters
   fstr += ")"
              
   return fstr
+}
+
+func funcTypeStr(f *ast.FuncType) string {
+  z := "PARAMS{"
+
+  // list of parameters
+  params := f.Params
+  for _, lv := range params.List {
+    pname := "_"
+    if len(lv.Names) > 0 {
+      pname = lv.Names[0].Name
+    }
+    tname := typeStr(lv.Type)
+    z +=  pname + " " + tname + ", "
+  }
+
+  // trim the last ", "
+  if z[len(z) - 2] == ',' {
+    z = z[0:len(z) - 2]
+  }
+
+  z += "} "
+  z += " RESULTS{"
+
+  // list of parameters
+  rr := f.Results
+  if rr != nil {
+    for _, lv := range rr.List {
+      pname := "_"
+      if len(lv.Names) > 0 {
+        pname = lv.Names[0].Name
+      }
+      tname := typeStr(lv.Type)
+      z +=  pname + " " + tname + ", "
+    }
+  }
+
+  // trim the last ", "
+  if z[len(z) - 2] == ',' {
+    z = z[0:len(z) - 2]
+  }
+
+  z += "} "
+  return z
 }
 
 func main() {

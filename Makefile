@@ -1,5 +1,8 @@
 all: t1 t2 t3 t4 t5
 
+run_grok:
+	go run grok.go /opt/go/src/pkg/*/
+
 t1 : t1.go
 	go build t1.go runtime.go
 	./t1
