@@ -1,14 +1,15 @@
 package main
 
+import "encoding/json"
 import "fmt"
 import "go/ast"
-// import "go/build"
 import "go/parser"
 import "go/token"
 import "os"
 import "strconv"
 import "strings"
 
+var _ = encoding.NewEncoder
 var _ = os.Open
 var _ = ast.Walk
 var _ = strconv.Atoi
@@ -164,6 +165,29 @@ func typeStr(a interface{}) string {
 
   return "?"
 }
+
+/*
+func type2json(a interface{}) string {
+  switch t := a.(type) {
+  case (*ast.Ident):
+    return t.Name
+  case (*ast.ArrayType):
+    return "[]" + typeStr(t.Elt)
+  case (*ast.StarExpr):
+    return "*" + typeStr(t.X)
+  case (*ast.Ellipsis):
+    return "@" + typeStr(t.Elt)
+  case (*ast.SelectorExpr):
+    return "{" + typeStr(t.X) + "}." + typeStr(t.Sel)
+  case (*ast.InterfaceType):
+    return "III" /* TODO */
+  case (*ast.Object):
+    return funcDeclStr(t.Decl.(*ast.FuncDecl))
+  }
+
+  return "?"
+}
+*/
 
 func funcDeclStr(f *ast.FuncDecl) string {
   fstr := "@"
