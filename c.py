@@ -194,4 +194,32 @@ def Translate(filename):
   a.Trans()
   print 'func main() { println("OK"); }'
 
-Translate(sys.argv[1])
+class ListParser(object):
+  def __init__(self, s):
+    self.ww = s.split()
+    self.p = 0
+
+  def ParseThing(self):
+    if self.ww[self.p] == "{":
+      self.p += 1
+      v = []
+      while self.ww[self.p] != "}":
+        v.append(self.ParseThing())
+      self.p += 1
+      return v
+    else:
+      z = self.ww[self.p]
+      self.p += 1
+      return z
+
+def Demo(fname):
+  f = open(fname)
+  for line in f:
+    line = line.strip()
+    print "<<<", line
+    print ">>>", repr(ListParser(line).ParseThing())
+    print "==============================================="
+
+if __name__ == '__main__':
+  # Translate(sys.argv[1])
+  Demo(sys.argv[1])

@@ -148,10 +148,10 @@ func GrokDir(dir string) {
   }
 }
 
-func typeStr(a interface{}) string {
+func OLD_typeStr(a interface{}) string {
   switch t := a.(type) {
   case (*ast.Ident):
-    return t.Name
+    return "IDENT:" + t.Name
   case (*ast.ArrayType):
     return "[]" + typeStr(t.Elt)
   case (*ast.StarExpr):
@@ -174,54 +174,53 @@ func typeStr(a interface{}) string {
 }
 
 
-func ZZZZZZZZZZZZZtype2json(a interface{}) string {
+func typeStr(a interface{}) string {
   switch t := a.(type) {
   case (*ast.Ident):
-    return t.Name
+    return "{ NAME " + t.Name + " } "
   case (*ast.ArrayType):
-    return "[]" + typeStr(t.Elt)
+    return "{ ARRAY " + typeStr(t.Elt) + " } "
   case (*ast.StarExpr):
-    return "*" + typeStr(t.X)
+    return "{ STAR " + typeStr(t.X) + " } "
   case (*ast.Ellipsis):
-    return "@" + typeStr(t.Elt)
+    return "{ ELLIPSIS " + typeStr(t.Elt) + " } "
   case (*ast.SelectorExpr):
-    return "{" + typeStr(t.X) + "}." + typeStr(t.Sel)
+    return "{ SEL " + typeStr(t.X) + " . " + typeStr(t.Sel) + " } "
   case (*ast.InterfaceType):
-    return "III" /* TODO */
+    return "{ INTERFACE " /* TODO */ + " } "
   case (*ast.Object):
-    return funcDeclStr(t.Decl.(*ast.FuncDecl))
+    return "{ OBJECT " + funcDeclStr(t.Decl.(*ast.FuncDecl)) + " } "
   }
 
   return "?"
 }
 
 func mapTypeStr(t *ast.MapType) string {
-  return "{ MAP: KEY: " + typeStr(t.Key) + " VALUE: " + typeStr(t.Value) + " } "
+  return "{ MAP " + typeStr(t.Key) + " -> " + typeStr(t.Value) + " } "
   // return "{ MAP: KEY: " + typeStr(t.Key.Obj.Decl) + " VALUE: " + typeStr(t.Value.Obj.Decl) + " } "
 }
 
 
 func funcDeclStr(f *ast.FuncDecl) string {
-  fstr := "@"
+  fstr := "{ "
   if f.Recv != nil {
     if len(f.Recv.List) != 1 { panic("f.Recv.List") }
-    fstr += "meth " + typeStr(f.Recv.List[0].Type) + " "
+    fstr += "METH "
   } else {
-    fstr += "func "
+    fstr += "FUNC "
   }
-  
-  fstr += f.Name.Name + " ("
+  fstr += f.Name.Name
 
-  fstr += funcTypeStr(f.Type)
+  if f.Recv != nil {
+    fstr += " { RECV " + typeStr(f.Recv.List[0].Type) + " } "
+  }
 
-  // End of parameters
-  fstr += ")"
-             
-  return fstr
+  fstr += " { SIG " + funcTypeStr(f.Type) + " } "
+  return fstr + " } "
 }
 
 func funcTypeStr(f *ast.FuncType) string {
-  z := "PARAMS{"
+  z := " { PARAMS { "
 
   // list of parameters
   params := f.Params
@@ -231,7 +230,7 @@ func funcTypeStr(f *ast.FuncType) string {
       pname = lv.Names[0].Name
     }
     tname := typeStr(lv.Type)
-    z +=  pname + " " + tname + ", "
+    z +=  pname + " : " + tname + ", "
   }
 
   // trim the last ", "
@@ -239,8 +238,8 @@ func funcTypeStr(f *ast.FuncType) string {
     z = z[0:len(z) - 2]
   }
 
-  z += "} "
-  z += " RESULTS{"
+  z += " } "
+  z += " RESULTS { "
 
   // list of parameters
   rr := f.Results
@@ -251,16 +250,11 @@ func funcTypeStr(f *ast.FuncType) string {
         pname = lv.Names[0].Name
       }
       tname := typeStr(lv.Type)
-      z +=  pname + " " + tname + ", "
+      z +=  pname + " : " + tname + " , "
     }
   }
 
-  // trim the last ", "
-  if z[len(z) - 2] == ',' {
-    z = z[0:len(z) - 2]
-  }
-
-  z += "} "
+  z += " } } "
   return z
 }
 
