@@ -204,9 +204,10 @@ class ListParser(object):
       self.p += 1
       v = []
       while self.ww[self.p] != "}":
-        v.append(self.ParseThing())
+          v.append(self.ParseThing())
       self.p += 1
-      return v
+      # Commas, colons, and any word ending in colon are OMITTED.
+      return [x for x in v if (x[-1] != ':' and x != "," if type(x) is str else True)]
     else:
       z = self.ww[self.p]
       self.p += 1
