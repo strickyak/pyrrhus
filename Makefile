@@ -3,8 +3,10 @@ all: t1 t2 t3 t4 t5
 run_grok:
 	go run grok.go /opt/go/src/pkg/*/
 
-run_1:
-	go run grok.go /opt/go/src/pkg/regexp/ | grep ^{ > ,1 ; python c.py ,1  
+run_1 : 1
+	: Support old name 'run_1'
+1:
+	go run grok.go /opt/go/src/pkg/regexp/ | grep ^@@ > ,1 ; python c.py ,1  
 
 t1 : t1.go
 	go build t1.go runtime.go

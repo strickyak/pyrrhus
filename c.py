@@ -215,7 +215,7 @@ class ListParser(object):
 def Demo(fname):
   f = open(fname)
   for line in f:
-    line = line.strip()
+    line = line.strip()[3:]  # Drop initial "@@ "
     print "<<<", line
     print ">>>", repr(ListParser(line).ParseThing())
     print "==============================================="

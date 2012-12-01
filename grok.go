@@ -96,6 +96,10 @@ If the directory couldn't be read, a nil map and the respective error are return
 
 var  fset = token.NewFileSet()
 
+func Str(x interface{}) string {
+  return fmt.Sprintf("%v", x)
+}
+
 func FilterDotGo(info os.FileInfo) bool {
   s := info.Name()
   n := len(s)
@@ -120,8 +124,11 @@ func GrokDir(dir string) {
 
 	switch x := dcl.(type) {
 	  case (*ast.FuncDecl):
+            if !ast.IsExported(x.Name.Name) {
+	      continue
+	    }
             fstr := funcDeclStr(x)
-            fmt.Printf("%s\n", fstr)
+            fmt.Printf("@@ %s\n", fstr)
 
             if strings.Contains(fstr, "?") {
               fmt.Printf("FUNC #%d == %#v\n", i, dcl);
@@ -148,36 +155,10 @@ func GrokDir(dir string) {
   }
 }
 
-func OLD_typeStr(a interface{}) string {
-  switch t := a.(type) {
-  case (*ast.Ident):
-    return "IDENT:" + t.Name
-  case (*ast.ArrayType):
-    return "[]" + typeStr(t.Elt)
-  case (*ast.StarExpr):
-    return "*" + typeStr(t.X)
-  case (*ast.Ellipsis):
-    return "@" + typeStr(t.Elt)
-  case (*ast.SelectorExpr):
-    return "{" + typeStr(t.X) + "}." + typeStr(t.Sel)
-  case (*ast.InterfaceType):
-    return "III" /* TODO */
-  // case (*ast.Object):  // IS THIS USED?
-  //   return funcDeclStr(t.Decl.(*ast.FuncDecl))
-  case (*ast.FuncType):
-    return funcTypeStr(t)
-  case (*ast.MapType):
-    return mapTypeStr(t)
-  }
-
-  return "?"
-}
-
-
 func typeStr(a interface{}) string {
   switch t := a.(type) {
   case (*ast.Ident):
-    return "{ NAME " + t.Name + " } "
+    return "'" + t.Name + " "
   case (*ast.ArrayType):
     return "{ ARRAY " + typeStr(t.Elt) + " } "
   case (*ast.StarExpr):
@@ -185,19 +166,22 @@ func typeStr(a interface{}) string {
   case (*ast.Ellipsis):
     return "{ ELLIPSIS " + typeStr(t.Elt) + " } "
   case (*ast.SelectorExpr):
-    return "{ SEL " + typeStr(t.X) + " . " + typeStr(t.Sel) + " } "
+    return "{ SEL " + typeStr(t.X) + " dot: " + typeStr(t.Sel) + " } "
   case (*ast.InterfaceType):
-    return "{ INTERFACE " /* TODO */ + " } "
+    return "{ INTERFACE todo: ...  } "
+  case (*ast.FuncType):
+    return "{ FN " + funcParamsResults(t) +  " } "
+  case (*ast.MapType):
+    return "{ MAP " + typeStr(t.Key) + " to: " + typeStr(t.Value) + " } "
+  case (*ast.ChanType):
+    return "{ CHAN " + Str(t.Dir) + " " + typeStr(t.Value) + " } "
+
   case (*ast.Object):
-    return "{ OBJECT " + funcDeclStr(t.Decl.(*ast.FuncDecl)) + " } "
+    panic("OBJECT")
+    // return "{ OBJECT " + funcDeclStr(t.Decl.(*ast.FuncDecl)) + " } "
   }
 
-  return "?"
-}
-
-func mapTypeStr(t *ast.MapType) string {
-  return "{ MAP " + typeStr(t.Key) + " -> " + typeStr(t.Value) + " } "
-  // return "{ MAP: KEY: " + typeStr(t.Key.Obj.Decl) + " VALUE: " + typeStr(t.Value.Obj.Decl) + " } "
+  return fmt.Sprintf("{ ?WHAT? %#v } ", a)
 }
 
 
@@ -205,43 +189,37 @@ func funcDeclStr(f *ast.FuncDecl) string {
   fstr := "{ "
   if f.Recv != nil {
     if len(f.Recv.List) != 1 { panic("f.Recv.List") }
-    fstr += "METH "
+    fstr += "METH  recv: " + typeStr(f.Recv.List[0].Type) + " "
   } else {
     fstr += "FUNC "
   }
-  fstr += f.Name.Name
-
-  if f.Recv != nil {
-    fstr += " { RECV " + typeStr(f.Recv.List[0].Type) + " } "
-  }
-
-  fstr += " { SIG " + funcTypeStr(f.Type) + " } "
+  fstr += " name: " + f.Name.Name + " " + funcParamsResults(f.Type) + " "
   return fstr + " } "
 }
 
-func funcTypeStr(f *ast.FuncType) string {
-  z := " { PARAMS { "
+func funcParamsResults(f *ast.FuncType) string {
+  z := " args: { "
 
   // list of parameters
   params := f.Params
+  i := 0
+  if params == nil { panic("params is never nil but it is") }
   for _, lv := range params.List {
     pname := "_"
     if len(lv.Names) > 0 {
       pname = lv.Names[0].Name
     }
     tname := typeStr(lv.Type)
-    z +=  pname + " : " + tname + ", "
-  }
-
-  // trim the last ", "
-  if z[len(z) - 2] == ',' {
-    z = z[0:len(z) - 2]
+    if i > 0 { z += " , " }
+    z +=  pname + " : " + tname
+    i++
   }
 
   z += " } "
-  z += " RESULTS { "
+  z += " results: { "
 
   // list of parameters
+  i = 0
   rr := f.Results
   if rr != nil {
     for _, lv := range rr.List {
@@ -250,11 +228,13 @@ func funcTypeStr(f *ast.FuncType) string {
         pname = lv.Names[0].Name
       }
       tname := typeStr(lv.Type)
-      z +=  pname + " : " + tname + " , "
+      if i > 0 { z += " , " }
+      z +=  pname + " : " + tname
     }
+    i++
   }
 
-  z += " } } "
+  z += " } "
   return z
 }
 
