@@ -216,9 +216,12 @@ class ListParser(object):
 def Demo(fname):
   f = open(fname)
   for line in f:
-    line = line.strip()[3:]  # Drop initial "@@ "
-    print "<<<", line
-    print ">>>", repr(ListParser(line).ParseThing())
+    print "<<<", line.strip()
+    w = line.split()
+    atat = w[0]
+    path = w[1]
+    data = ListParser(' '.join(w[2:])).ParseThing()
+    print ">>>", atat, path, repr(data)
     print "==============================================="
 
 if __name__ == '__main__':

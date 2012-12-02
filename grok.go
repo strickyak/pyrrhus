@@ -1,7 +1,7 @@
 package main
 
 import "encoding/json"
-import "fmt"
+import . "fmt"
 import "go/ast"
 import "go/parser"
 import "go/token"
@@ -15,89 +15,49 @@ var _ = ast.Walk
 var _ = strconv.Atoi
 var _ = strings.Contains
 
-/*  [go/ast]
-type Importer func(imports map[string]*Object, path string) (pkg *Object, err error)
+var fset = token.NewFileSet()
 
-An Importer resolves import paths to package Objects. The imports map records the packages already imported, indexed by package id (canonical import path). An Importer must determine the canonical import path and check the map to see if it is already present in the imports map. If so, the Importer can return the map entry. Otherwise, the Importer should load the package data for the given path into a new *Object (pkg), record pkg in the imports map, and then return pkg.
-
-func NewPackage(fset *token.FileSet, files map[string]*File, importer Importer, universe *Scope) (*Package, error)
-
-NewPackage creates a new Package node from a set of File nodes. It resolves unresolved identifiers across files and updates each file's Unresolved list accordingly. If a non-nil importer and universe scope are provided, they are used to resolve identifiers not declared in any of the package files. Any remaining unresolved identifiers are reported as undeclared. If the files belong to different packages, one package name is selected and files with different package names are reported and then ignored. The result is a package node and a scanner.ErrorList if there were errors.
-
-[go/build]
-type Package struct {
-    Dir        string // directory containing package sources
-    Name       string // package name
-    Doc        string // documentation synopsis
-    ImportPath string // import path of package ("" if unknown)
-    Root       string // root of Go tree where this package lives
-    SrcRoot    string // package source root directory ("" if unknown)
-    PkgRoot    string // package install root directory ("" if unknown)
-    BinDir     string // command install directory ("" if unknown)
-    Goroot     bool   // package found in Go root
-    PkgObj     string // installed .a file
-
-    // Source files
-    GoFiles   []string // .go source files (excluding CgoFiles, TestGoFiles, XTestGoFiles)
-    CgoFiles  []string // .go source files that import "C"
-    CFiles    []string // .c source files
-    HFiles    []string // .h source files
-    SFiles    []string // .s source files
-    SysoFiles []string // .syso system object files to add to archive
-
-    // Cgo directives
-    CgoPkgConfig []string // Cgo pkg-config directives
-    CgoCFLAGS    []string // Cgo CFLAGS directives
-    CgoLDFLAGS   []string // Cgo LDFLAGS directives
-
-    // Dependency information
-    Imports   []string                    // imports from GoFiles, CgoFiles
-    ImportPos map[string][]token.Position // line information for Imports
-
-    // Test information
-    TestGoFiles    []string                    // _test.go files in package
-    TestImports    []string                    // imports from TestGoFiles
-    TestImportPos  map[string][]token.Position // line information for TestImports
-    XTestGoFiles   []string                    // _test.go files outside package
-    XTestImports   []string                    // imports from XTestGoFiles
-    XTestImportPos map[string][]token.Position // line information for XTestImports
+// Format any object as string.
+func Str(x interface{}) string {
+  return Sprintf("%v", x)
 }
 
-[parser]
+// Executable-like Representation.
+func Repr(x interface{}) string {
+  return Sprintf("%#v", x)
+}
 
-func ParseDir(fset *token.FileSet, path string, filter func(os.FileInfo) bool, mode Mode) (pkgs map[string]*ast.Package, first error)
+// Like a ? : operator for strings (but both eval).
+func Cond(b bool, t string, f string) string {
+  if b {
+    return t
+  }
+  return f
+}
 
-ParseDir calls ParseFile for the files in the directory specified by path and returns a map of package name -> package AST with all the packages found. If filter != nil, only the files with os.FileInfo entries passing through the filter are considered. The mode bits are passed to ParseFile unchanged. Position information is recorded in the file set fset.
+func AfterFirstDelim(s string, delim string, otherwise string) string {
+  j := strings.Index(s, delim)
+  if j < 0 {
+    return otherwise
+  }
+  return s[ j + len(delim) : ]
+}
 
-If the directory couldn't be read, a nil map and the respective error are returned. If a parse error occurred, a non-nil but incomplete map and the first error encountered are returned.
+func BeforeFinalDelim(s string, delim string, otherwise string) string {
+  j := strings.LastIndex(s, delim)
+  if j < 0 {
+    return otherwise
+  }
+  return s[ : j]
+}
 
-
-*/
-
-//func DumpBuildInfo() {
-//  fmt.Printf("Default Build Context: %#v\n", build.Default)
-//
-//  p, err := build.Import("fmt", "", build.AllowBinary)
-//  fmt.Printf("err %#v\n", err);
-//  fmt.Printf("p %#v\n", p);
-//  
-//  fset := token.NewFileSet()
-//  //// universe := ast.NewScope(nil)
-//  //// files := make(map[string]*ast.File)
-//  //// // NewPackage(fset *token.FileSet, files map[string]*File, importer Importer, universe *Scope) (*Package, error)
-//  //// pack, err := ast.NewPackage(fset, files, nil, universe)
-//  //// fmt.Printf("err %#v\n", err);
-//  //// fmt.Printf("pack %#v\n", pack);
-//
-//  pkgs, err := parser.ParseDir(fset, "/opt/go/src/pkg/fmt", nil, parser.Mode(0))
-//  fmt.Printf("err %#v\n", err);
-//  fmt.Printf("pkgs %#v\n", pkgs);
-//}
-
-var  fset = token.NewFileSet()
-
-func Str(x interface{}) string {
-  return fmt.Sprintf("%v", x)
+func EndsWith(s string, tail string) bool {
+  n := len(s)
+  t := len(tail)
+  if n < t {
+    return false
+  }
+  return s[n-t: ] == tail
 }
 
 func FilterDotGo(info os.FileInfo) bool {
@@ -110,52 +70,98 @@ func FilterDotGo(info os.FileInfo) bool {
 func GrokDir(dir string) {
   pkgs, err := parser.ParseDir(fset, dir, FilterDotGo, parser.Mode(0))
   if err != nil {
-    panic(fmt.Sprintf("ERROR <%q> IN DIR <%s>", err, dir))
+    panic(Sprintf("ERROR <%q> IN DIR <%s>", err, dir))
   }
+
+  // Find the subdir that follows /pkg/
+  subdir := AfterFirstDelim(dir, "/pkg/", "")
+  if len(subdir) == 0 {
+    panic("dir does not contain /pkg/ plus a tail: " + dir)
+  }
+
+  // Trim trailing /, if any.
+  if subdir[ len(subdir) - 1 ] == '/' {
+    subdir = subdir[ : len(subdir) - 1 ]
+  }
+
   for pk, pv := range pkgs {
-    if strings.Contains(pk, "_test") { continue }
-    fmt.Printf("pk %#v\n", pk);
-    fmt.Printf("pv %#v\n", pv);
+    // For dirpkg, remove final piece of subdir
+    // and replace with stated package name.
+    // Often these are the same, but not always.
+    updir := BeforeFinalDelim(subdir, "/", "")
+    dirpkg := Cond(updir == "", pk, updir + "/" + pk)
 
-    for fk, fv := range pv.Files {
-      fmt.Printf("fk %#v\n", fk);
-      // fmt.Printf("fv %#v\n", fv);
+    Printf("#dirpkg %#v\n", dirpkg);
+    Printf("#pv %#v\n", pv);
+
+    for _, fv := range pv.Files {
       for i, dcl := range fv.Decls {
-
-	switch x := dcl.(type) {
-	  case (*ast.FuncDecl):
-            if !ast.IsExported(x.Name.Name) {
-	      continue
-	    }
-            fstr := funcDeclStr(x)
-            fmt.Printf("@@ %s\n", fstr)
-
-            if strings.Contains(fstr, "?") {
-              fmt.Printf("FUNC #%d == %#v\n", i, dcl);
-              fmt.Printf("   Recv: %#v\n", x.Recv)
-	      if x.Recv != nil {
-                for _, elem := range x.Recv.List {
-                  fmt.Printf("      Elem: %#v\n", elem)
-		  for _, rid := range elem.Names {
-                    fmt.Printf("      Name: %#v\n", rid.Name)
-		  }
-                  fmt.Printf("      Type: %#v\n", elem.Type)
-                  fmt.Printf("      ====: %s\n", typeStr(elem.Type))
-                  fmt.Printf("      ====: %s\n", ast.Print(fset, elem.Type))
-                }
-              }
-
-              fmt.Printf("  FUNC Type = %s\n", ast.Print(fset, x.Type))
-            }
-	  default:
-            fmt.Printf("DECL #%d == %#v\n", i, dcl);
-	}
+        doDecl(dcl, i, dirpkg)
       }
     }
   }
 }
 
+func doDecl(dcl interface{}, i int, dirpkg string) {
+	switch x := dcl.(type) {
+	  case (*ast.FuncDecl):
+            if !ast.IsExported(x.Name.Name) {
+	      return
+	    }
+            fstr := funcDeclStr(x)
+            Printf("@@ %s %s\n", dirpkg, fstr)
+
+            if strings.Contains(fstr, "?") {
+	      panic(fstr)
+            }
+	  case (*ast.GenDecl):
+	    for sk, sv := range x.Specs {
+	      doSpec(sk, sv, dirpkg)
+	    }
+	  default:
+	    panic(Repr(dcl))
+	}
+}
+
+func doSpec(sk int, sv interface{}, dirpkg string) {
+  //Printf("doSpec: %#v\n", sv)
+  switch x := sv.(type) {
+  case (*ast.ImportSpec):
+    path := x.Path.Value
+    path = path[1 : len(path)-1]  // Omit initial & final <">
+    name := path
+    j := strings.LastIndex(name, "/")
+    if j > 0 {
+      name = name[j+1 : ]
+    }
+    if x.Name != nil {
+      name = x.Name.Name
+    }
+    //Printf("ImportSpec: NAME %s PATH %s\n", name, path)
+    Printf("@@ %s { IMPORT %s path: %s }\n", dirpkg, name, path)
+  case (*ast.TypeSpec):
+    name := x.Name.Name
+    if !ast.IsExported(x.Name.Name) {
+      return
+    }
+    Printf("@@ %s { TYPE %s type: %s }\n", dirpkg, name, typeStr(x.Type))
+  case (*ast.ValueSpec):
+    for _, nv := range x.Names {
+      //Printf("    ValueSPEC [%d] %s : %s\n", nk, nv.Name, Cond(x.Type == nil, "nil", typeStr(x.Type)))
+      if !ast.IsExported(nv.Name) {
+        return
+      }
+      Printf("@@ %s { VALUE %s : %s }\n", dirpkg, nv.Name, Cond(x.Type == nil, "!", typeStr(x.Type)))
+    }
+  default:
+    panic(Sprintf("doSpec: DEFAULT: %#v\n", x))
+  }
+}
+
 func typeStr(a interface{}) string {
+  if a == nil {
+    return "nil"
+  }
   switch t := a.(type) {
   case (*ast.Ident):
     return "'" + t.Name + " "
@@ -176,12 +182,27 @@ func typeStr(a interface{}) string {
   case (*ast.ChanType):
     return "{ CHAN " + Str(t.Dir) + " " + typeStr(t.Value) + " } "
 
-  case (*ast.Object):
-    panic("OBJECT")
-    // return "{ OBJECT " + funcDeclStr(t.Decl.(*ast.FuncDecl)) + " } "
+  case (*ast.StructType):
+    z := Sprintf("{ STRUCT complete: %s { ", Cond(t.Incomplete, "F", "T"))
+    Printf("#    %#v\n", t)
+    Printf("#    %#v\n", t.Fields)
+    for fk, fv := range t.Fields.List {
+      Printf("#    [%v]  %#v\n", fk, fv)
+      if fv.Names == nil {
+        z = Sprintf("%s , ! : %s ", z, typeStr(fv.Type))
+      }
+      for _, nv := range fv.Names {
+        Printf("#      Name: %s  Type: %s\n", nv.Name, typeStr(fv.Type))
+        if !ast.IsExported(nv.Name) {
+	  continue
+	}
+        z = Sprintf("%s , %s : %s ", z, nv.Name, typeStr(fv.Type))
+      }
+    }
+    return z + " } } "
   }
 
-  return fmt.Sprintf("{ ?WHAT? %#v } ", a)
+  panic(Sprintf("{ ?WHAT? %#v } ", a))
 }
 
 
@@ -189,20 +210,19 @@ func funcDeclStr(f *ast.FuncDecl) string {
   fstr := "{ "
   if f.Recv != nil {
     if len(f.Recv.List) != 1 { panic("f.Recv.List") }
-    fstr += "METH  recv: " + typeStr(f.Recv.List[0].Type) + " "
+    fstr += "METH " + f.Name.Name + " recv: " + typeStr(f.Recv.List[0].Type)
   } else {
-    fstr += "FUNC "
+    fstr += "FUNC " + f.Name.Name
   }
-  fstr += " name: " + f.Name.Name + " " + funcParamsResults(f.Type) + " "
-  return fstr + " } "
+  fstr += " " + funcParamsResults(f.Type) + " } "
+  return fstr
 }
 
 func funcParamsResults(f *ast.FuncType) string {
-  z := " args: { "
+  z := "args: { "
 
   // list of parameters
   params := f.Params
-  i := 0
   if params == nil { panic("params is never nil but it is") }
   for _, lv := range params.List {
     pname := "_"
@@ -210,16 +230,13 @@ func funcParamsResults(f *ast.FuncType) string {
       pname = lv.Names[0].Name
     }
     tname := typeStr(lv.Type)
-    if i > 0 { z += " , " }
-    z +=  pname + " : " + tname
-    i++
+    z +=  ", " + pname + " : " + tname
   }
 
-  z += " } "
-  z += " results: { "
+  z += "} "
+  z += "results: { "
 
   // list of parameters
-  i = 0
   rr := f.Results
   if rr != nil {
     for _, lv := range rr.List {
@@ -228,13 +245,11 @@ func funcParamsResults(f *ast.FuncType) string {
         pname = lv.Names[0].Name
       }
       tname := typeStr(lv.Type)
-      if i > 0 { z += " , " }
-      z +=  pname + " : " + tname
+      z +=  ", " + pname + " : " + tname
     }
-    i++
   }
 
-  z += " } "
+  z += "} "
   return z
 }
 

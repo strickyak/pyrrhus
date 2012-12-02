@@ -6,7 +6,7 @@ run_grok:
 run_1 : 1
 	: Support old name 'run_1'
 1:
-	go run grok.go /opt/go/src/pkg/regexp/ | grep ^@@ > ,1 ; python c.py ,1  
+	go run grok.go $$(eval $$(go env) ; find $$GOROOT/src/pkg/* -type d) | grep ^@@ > ,1 ; python c.py ,1  
 
 t1 : t1.go
 	go build t1.go runtime.go
