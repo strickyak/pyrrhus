@@ -111,7 +111,26 @@ def TReturn(p):
 @V
 def VCall(p):
   aa = ','.join([x.Value() for x in p.args]) if p.args else ''
-  return '( %s ( %s ))' % (p.func.Value(), aa)
+
+  # Try to turn fval into package & func name.
+  fval = p.func.Value()
+  fvec = fval.split('.')
+  if len(fvec) > 1:
+    fpkg = '.'.join(fvec[:-1])
+    # Omit the p_.  THis is ugly.
+    if fpkg[:2] == 'p_':
+      fpkg = fpkg[2:]
+    fname = fvec[-1]
+    print " # fval %s fvec %s fpkg %s fname %s" % (fval, fvec, fpkg, fname)
+
+    imp = Imports.get(fpkg)
+    grok = Grok.get(fpkg)
+    if imp and grok:
+      fdecl = grok.get(fname)
+      if fdecl:
+        print " # fdecl %s" % (fdecl, )
+
+  return '( %s ( %s ))' % (fval, aa)
 
 @V
 def VNum(p):
@@ -157,6 +176,7 @@ def VName(p):
 
 @T
 def TImport(p):
+  raise Exception("For now, only imports from go or go.X allowed")
   for x in p.names:
     targ = x.name
     alias = x.asname if x.asname else x.name
@@ -168,6 +188,9 @@ def TImport(p):
 def TImportFrom(p):
   for x in p.names:
     targ = '%s.%s' % (p.module, x.name)
+    # Only support go.* for now, and strip the go.
+    if targ[:3] == "go.":
+      targ = targ[3:]
     alias = x.asname if x.asname else x.name
     Imports[alias] = targ
     print 'import p_%s "%s"' % (alias, '/'.join(targ.split('.')))
@@ -224,6 +247,21 @@ def Demo(fname):
     print ">>>", atat, path, repr(data)
     print "==============================================="
 
+Grok = {}
+def LoadGrok(fname):
+  f = open(fname)
+  for line in f:
+    w = line.split()
+    atat = w[0]
+    path = w[1]
+    data = ListParser(' '.join(w[2:])).ParseThing()
+    name = data[1]
+
+    d = Grok.get(path)
+    if not d:
+      Grok[path] = d = {}
+    d[name] = data
+
 if __name__ == '__main__':
-  # Translate(sys.argv[1])
-  Demo(sys.argv[1])
+  LoadGrok("_grok.txt")
+  Translate(sys.argv[1])

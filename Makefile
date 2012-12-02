@@ -1,7 +1,10 @@
-all: t1 t2 t3 t4 t5
+all: _grok.txt t1 t2 t3 t4 t5
 
-run_grok:
-	go run grok.go /opt/go/src/pkg/*/
+_grok.txt: _grok.tmp
+	grep ^@@ < _grok.tmp > _grok.txt
+
+_grok.tmp: grok.go
+	go run grok.go $$( eval $$(go env) ; find $$GOROOT/src/pkg/* -type d ) > _grok.tmp
 
 run_1 : 1
 	: Support old name 'run_1'
@@ -39,4 +42,4 @@ t5.go : t5.py
 	python c.py t5.py > t5.go || { mv t5.go t5.bad ; false ; }
 
 clean:
-	rm -f t*[0-9].go t*[0-9] t*[0-9].bad
+	rm -f t*[0-9].go t*[0-9] t*[0-9].bad _grok.t??

@@ -1,8 +1,8 @@
 # Simple 'Hello World' web server.
 
-import os
-import fmt
-from net import http
+from go import os
+from go import fmt
+from go.net import http
 
 def home(w, r):
   fmt.Fprintf(w, 'Hello World!')
