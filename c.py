@@ -43,7 +43,7 @@ def Twosies(aa):
 
 
 OpNames = {
-
+  # Map ast node class names to our methods on Pobj.
   'Add': 'Xadd',
   'Sub': 'Xsub',
   'Mult': 'Xmul',
@@ -77,17 +77,10 @@ def VSubscript(p):
 
   if p.slice.__class__ is ast.Index:
     ix = p.slice.value.Value()
+    # TODO: ix could be a slice instance at runtime.
     return "(%s).Xindex(%s)" % (p.value.Value(), ix)
 
   raise Exception("VSubscript BAD: %s" % ast.dump(p))
-
-#@V
-#def VSlice(p):
-#  lower = "(%s)" % (p.lower.Value(),) if p.lower is not None else "nil"
-#  upper = "(%s)" % (p.upper.Value(),) if p.upper is not None else "nil"
-#
-#  # TODO: negative slices.
-#  return "%s:%s" % (lower, upper)
 
 def DoBody(body):
   print "//--- body len is %d, body=%s" % (len(body), body)
@@ -110,6 +103,7 @@ def TFunctionDef(p):
     print ''
     print 'func G_%s(%s) Pobj {' % (p.name, args_str)
     DoBody(p.body)
+    print '  return Pstr("")  // extra return should be Pnone'
     print '}  // end func %s' % p.name
     print ''
   finally:
@@ -158,9 +152,11 @@ def GoType(a):
   # We must understand these names in the scope they are seen,
   # i.e. in the net/http package.
   if a == "'ResponseWriter":
-    return "http.ResponseWriter"
+    return "p_http.ResponseWriter"
   if a == "'Request":
-    return "http.Request"
+    return "p_http.Request"
+  if a == "'Handler":
+    return "p_http.Handler"
 
   if type(a) is str:
     return a[1:] if a[0] == "'" else a
@@ -168,6 +164,8 @@ def GoType(a):
     raise "Bad GoType"
   # list:
   h = a[0]
+  if h == "STAR":
+    return "*%s" % GoType(a[1])
   if h == "SEL":
     return "p_%s.%s" % (GoType(a[1]), GoType(a[2]))
   if h == "FN":
@@ -181,6 +179,7 @@ def GoType(a):
       z += "%s %s %s" % (comma, name, GoType(typ))
     z += ") "
     return z
+  raise Exception("no case in GoType")
 
 NextTmp = 100
 def NewTmp(prefix):
@@ -220,7 +219,7 @@ def AdaptArgToFn(a, d):
   fn += "  _ = %s (" % a.Value()
 
   for i,comma,_,t in Twosies(args):
-    fn += "%s %s" % (comma, AdaptArgToDecl(QuickValue("arg%d"%i), t))
+    fn += "%s NewPgo(arg%d)" % (comma, i)
 
   fn += ")\n"
   fn += "}\n"
@@ -228,9 +227,16 @@ def AdaptArgToFn(a, d):
   EmitLater(fn)
 
   return tmp
+  # return "NewPgo(%s)" % tmp
 
 def AdaptArgToDecl(a, d):
   print "//# AdaptArgToDecl( %s , %s )" % (a, d)
+
+  if a is None:
+    return "nil"  # Kludge?
+  if a.Value() == "G_None":
+    return "nil"  # Kludge?
+
   if d == 'Pobj':
     return a.Value()
   if IsPrimType(d):
@@ -313,9 +319,12 @@ def VStr(p):
 @T
 def TPrint(p):
   for x in p.values:
-    print 'func init() { print((%s).String()); }' % x.Value()
+    print 'func init() {'
+    v = x.Value()
+    print '  print((%s).String())' % v
+    print '}'
   if p.nl:
-    print 'func init() { println(); }'
+    print 'func init() { println() }'
 
 @T
 def TExpr(p):
@@ -328,10 +337,6 @@ def VAttribute(p):
     return '%s.%s' % (p.value.Value(), p.attr)
   else:
     return '(%s).%s' % (p.value.Value(), p.attr)
-
-#@V
-#def VIndex(p):
-#  return p.value.Value()
 
 @V
 def VName(p):

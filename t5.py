@@ -8,8 +8,12 @@ from go.net import http
 def home(w, r):
   fmt.Fprintf(w, 'Hello World!')
 
-print http.HandleFunc('/', home)
-print http.ListenAndServe('127.0.0.1:1111', None)
+def serve():
+  http.HandleFunc('/', home)
+  http.ListenAndServe('127.0.0.1:1111', None)
+  return 0
+
+print serve()
 
 # Based on this golang code:
 ##  package main
