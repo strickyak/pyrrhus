@@ -1,7 +1,8 @@
 package main
 
-import "fmt"
+import . "fmt"
 import "os"
+import "reflect"
 import "strconv"
 
 var _ = os.Open
@@ -26,6 +27,8 @@ type Pobj interface {
 	Xne(o Pobj) Pbool
 	Xgt(o Pobj) Pbool
 	Xge(o Pobj) Pbool
+	Xindex(a Pobj) Pobj
+	Xslice(a Pobj, b Pobj) Pobj
 }
 
 // Pstr
@@ -131,6 +134,30 @@ func (s Pstr) Xge(o Pobj) Pbool {
 	return false
 }
 
+func (me Pstr) Xindex(a Pobj) Pobj {
+	s := string(me)
+	Printf("Pstr::Xindex %#v %#v\n", s, a)
+	i := a.Int64()
+	if i < 0 {
+	  i += int64(len(s))
+	}
+	return Pstr(s[i : i+1])  // One char string.
+}
+func (me Pstr) Xslice(a Pobj, b Pobj) Pobj {
+	s := string(me)
+	Printf("Pstr::Xslice %#v %#v %#v\n", s, a, b)
+	if a != nil && b == nil {
+	  return Pstr(s[a.Int64() : ])
+	}
+	if a == nil && b != nil {
+	  return Pstr(s[ : b.Int64()])
+	}
+	if a != nil && b != nil {
+	  return Pstr(s[a.Int64() : b.Int64()])
+	}
+	return me  // Both nil.
+}
+
 // ~~~Pstr
 
 // Pint
@@ -144,7 +171,7 @@ func (i Pint) Int64() int64 {
 }
 
 func (i Pint) String() string {
-	return fmt.Sprintf("%d", int64(i))
+	return Sprintf("%d", int64(i))
 }
 
 func (i Pint) Xstr() Pstr {
@@ -235,113 +262,236 @@ func (i Pint) Xge(o Pobj) Pbool {
 	return false
 }
 
+func (me Pint) Xindex(a Pobj) Pobj {
+	panic("Pstr cannot index")
+}
+func (s Pint) Xslice(a Pobj, b Pobj) Pobj {
+	panic("Pint cannot slice")
+}
 // ~~~Pint
 
 // Pbool
 type Pbool bool
 
-func (b Pbool) Bool() bool {
-	return bool(b)
+func (me Pbool) Bool() bool {
+	return bool(me)
 }
-func (b Pbool) Int64() int64 {
-	if bool(b) { return 1 }
+func (me Pbool) Int64() int64 {
+	if bool(me) { return 1 }
 	return 0
 }
 
-func (b Pbool) String() string {
-	return fmt.Sprintf("%v", bool(b))
+func (me Pbool) String() string {
+	return Sprintf("%v", bool(me))
 }
 
-func (b Pbool) Xstr() Pstr {
-	return Pstr(b.String())
+func (me Pbool) Xstr() Pstr {
+	return Pstr(me.String())
 }
 
-func (b Pbool) Xint() Pint {
-	if bool(b) {
+func (me Pbool) Xint() Pint {
+	if bool(me) {
 		return 1
 	}
-
 	return 0
 }
 
-func (b Pbool) Xadd(o Pobj) Pobj {
-	return Pint( b.Xint() + o.(Pbool).Xint())
+func (me Pbool) Xadd(o Pobj) Pobj {
+	return Pint( me.Xint() + o.(Pbool).Xint())
 }
 
-func (b Pbool) Xsub(o Pobj) Pobj {
-	return Pint( b.Xint() - o.(Pbool).Xint() )
+func (me Pbool) Xsub(o Pobj) Pobj {
+	return Pint( me.Xint() - o.(Pbool).Xint() )
 }
 
-func (b Pbool) Xmul(o Pobj) Pobj {
-	return Pint( b.Xint() * o.(Pbool).Xint() )
+func (me Pbool) Xmul(o Pobj) Pobj {
+	return Pint( me.Xint() * o.(Pbool).Xint() )
 }
 
-func (b Pbool) Xmod(o Pobj) Pobj {
-	return Pint( b.Xint() % o.(Pbool).Xint() )
+func (me Pbool) Xmod(o Pobj) Pobj {
+	return Pint( me.Xint() % o.(Pbool).Xint() )
 }
 
-func (b Pbool) Xdiv(o Pobj) Pobj {
-	return Pint( b.Xint() / o.(Pbool).Xint() )
+func (me Pbool) Xdiv(o Pobj) Pobj {
+	return Pint( me.Xint() / o.(Pbool).Xint() )
 }
 
-func (b Pbool) Xcmp(o Pobj) Pint {
-	if b == o.(Pbool) {
+func (me Pbool) Xcmp(o Pobj) Pint {
+	if me == o.(Pbool) {
 		return 0
 	}
 
-	if b {
+	if me {
 		return 1
 	}
 
 	return -1
 }
 
-func (b Pbool) Xlt(o Pobj) Pbool {
-	if b.Xcmp(o) < 0 {
+func (me Pbool) Xlt(o Pobj) Pbool {
+	if me.Xcmp(o) < 0 {
 		return true
 	}
 
 	return false
 }
 
-func (b Pbool) Xle(o Pobj) Pbool {
-	if b.Xcmp(o) <= 0 {
+func (me Pbool) Xle(o Pobj) Pbool {
+	if me.Xcmp(o) <= 0 {
 		return true
 	}
 
 	return false
 }
 
-func (b Pbool) Xeq(o Pobj) Pbool {
-	if b.Xcmp(o) == 0 {
+func (me Pbool) Xeq(o Pobj) Pbool {
+	if me.Xcmp(o) == 0 {
 		return true
 	}
 
 	return false
 }
 
-func (b Pbool) Xne(o Pobj) Pbool {
-	if b.Xcmp(o) != 0 {
+func (me Pbool) Xne(o Pobj) Pbool {
+	if me.Xcmp(o) != 0 {
 		return true
 	}
 
 	return false
 }
 
-func (b Pbool) Xgt(o Pobj) Pbool {
-	if b.Xcmp(o) > 0 {
+func (me Pbool) Xgt(o Pobj) Pbool {
+	if me.Xcmp(o) > 0 {
 		return true
 	}
 
 	return false
 }
 
-func (b Pbool) Xge(o Pobj) Pbool {
-	if b.Xcmp(o) >= 0 {
+func (me Pbool) Xge(o Pobj) Pbool {
+	if me.Xcmp(o) >= 0 {
 		return true
 	}
 
 	return false
 }
 
+func (me Pbool) Xindex(a Pobj) Pobj {
+	panic("Pbool cannot index")
+}
+func (s Pbool) Xslice(a Pobj, b Pobj) Pobj {
+	panic("Pbool cannot slice")
+}
+// ~~~Pbool
+
+// Pgo
+type Pgo struct {
+	P	interface{}
+}
+
+func NewPgo(a interface{}) Pgo {
+	return Pgo{P: a}
+}
+
+func (me Pgo) Bool() bool {
+	panic("Pgo cannot Bool")
+}
+func (me Pgo) Int64() int64 {
+	panic("Pgo cannot Bool")
+}
+
+func (me Pgo) String() string {
+	return Sprintf("%v", me)
+}
+
+func (me Pgo) Xstr() Pstr {
+	return Pstr(me.String())
+}
+
+func (me Pgo) Xint() Pint {
+	panic("Pgo cannot int")
+}
+
+func (me Pgo) Xadd(o Pobj) Pobj {
+	panic("Pgo cannot add")
+}
+
+func (me Pgo) Xsub(o Pobj) Pobj {
+	panic("Pgo cannot sub")
+}
+
+func (me Pgo) Xmul(o Pobj) Pobj {
+	panic("Pgo cannot mul")
+}
+
+func (me Pgo) Xmod(o Pobj) Pobj {
+	panic("Pgo cannot mod")
+}
+
+func (me Pgo) Xdiv(o Pobj) Pobj {
+	panic("Pgo cannot div")
+}
+
+func (me Pgo) Xcmp(it Pobj) Pint {
+	a := reflect.ValueOf(me.P).Addr().Uint()
+	switch x := it.(type) {
+	case Pgo:
+	    	b := reflect.ValueOf(x.P).Addr().Uint()
+		if a < b {
+			return -1
+		}
+		if a > b {
+			return 1
+		}
+	default:
+		panic("Pgo cannot cmp non-Pgo")
+	}
+	return 0
+}
+
+func (me Pgo) Xlt(o Pobj) Pbool {
+	return me.Xcmp(o) < 0
+}
+
+func (me Pgo) Xle(o Pobj) Pbool {
+	if me.Xcmp(o) <= 0 {
+		return true
+	}
+	return false
+}
+
+func (me Pgo) Xeq(o Pobj) Pbool {
+	if me.Xcmp(o) == 0 {
+		return true
+	}
+	return false
+}
+
+func (me Pgo) Xne(o Pobj) Pbool {
+	if me.Xcmp(o) != 0 {
+		return true
+	}
+	return false
+}
+
+func (me Pgo) Xgt(o Pobj) Pbool {
+	if me.Xcmp(o) > 0 {
+		return true
+	}
+	return false
+}
+
+func (me Pgo) Xge(o Pobj) Pbool {
+	if me.Xcmp(o) >= 0 {
+		return true
+	}
+	return false
+}
+
+func (me Pgo) Xindex(a Pobj) Pobj {
+	panic("Pgo cannot index")
+}
+func (s Pgo) Xslice(a Pobj, b Pobj) Pobj {
+	panic("Pgo cannot slice")
+}
 // ~~~Pbool

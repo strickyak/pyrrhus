@@ -29,6 +29,19 @@ class V(object):
   def __call__(self):
     pass
 
+def Twosies(aa):
+  """Iterate pairs of elements from list aa"""
+  i = 0
+  comma = ""
+  while aa:
+    x = aa[0]
+    y = aa[1]
+    yield i, comma, x, y
+    aa = aa[2:]
+    i += 1
+    comma = ","
+
+
 OpNames = {
 
   'Add': 'Xadd',
@@ -57,14 +70,24 @@ def VCompare(p):
 
 @V
 def VSubscript(p):
-  return "%s[%s]" % (p.value.Value(), p.slice.Value())
+  if p.slice.__class__ is ast.Slice:
+    lo = p.slice.lower.Value() if p.slice.lower else "nil"
+    hi = p.slice.upper.Value() if p.slice.upper else "nil"
+    return "(%s).Xslice(%s, %s)" % (p.value.Value(), lo, hi)
 
-@V
-def VSlice(p):
-  lower = p.lower.Value() if p.lower is not None else ""
-  upper = p.upper.Value() if p.upper is not None else ""
-  # TODO: negative slices.
-  return "%s:%s" % (lower, upper)
+  if p.slice.__class__ is ast.Index:
+    ix = p.slice.value.Value()
+    return "(%s).Xindex(%s)" % (p.value.Value(), ix)
+
+  raise Exception("VSubscript BAD: %s" % ast.dump(p))
+
+#@V
+#def VSlice(p):
+#  lower = "(%s)" % (p.lower.Value(),) if p.lower is not None else "nil"
+#  upper = "(%s)" % (p.upper.Value(),) if p.upper is not None else "nil"
+#
+#  # TODO: negative slices.
+#  return "%s:%s" % (lower, upper)
 
 def DoBody(body):
   print "//--- body len is %d, body=%s" % (len(body), body)
@@ -97,7 +120,7 @@ def TIf(p):
   print 'if (%s).Bool() {' % p.test.Value()
   DoBody(p.body)
   if p.orelse:
-    pass # TODO
+    raise "TODO" # TODO
   print '}'
 
 @T
@@ -108,9 +131,144 @@ def TAssign(p):
 def TReturn(p):
   print 'return %s' % p.value.Value()
 
+PRIM = dict(
+    int='Pint', int32='Pint', int64='Pint',
+    uint='Pint', uint32='Pint', uint64='Pint', uintptr='Pint',
+    byte='Pint', rune='Pint',
+    float='Pint', double='Pint',
+    string='Pstr',
+    bool='Pbool',
+    )
+DEPRIM = dict(
+    int='Int64', int32='Int64', int64='Int64',
+    uint='Int64', uint32='Int64', uint64='Int64', uintptr='Int64',
+    byte='Int64', rune='Int64',
+    float='Int64', double='Int64',
+    string='String',
+    bool='Bool',
+    )
+def IsPrimType(a):
+  if a[0] == "'":
+    return type(a) is str and PRIM.get(a[1:])
+  else:
+    return type(a) is str and PRIM.get(a)
+
+def GoType(a):
+  # Horrible Kludge: Hardwire these.
+  # We must understand these names in the scope they are seen,
+  # i.e. in the net/http package.
+  if a == "'ResponseWriter":
+    return "http.ResponseWriter"
+  if a == "'Request":
+    return "http.Request"
+
+  if type(a) is str:
+    return a[1:] if a[0] == "'" else a
+  elif type(a) is not list:
+    raise "Bad GoType"
+  # list:
+  h = a[0]
+  if h == "SEL":
+    return "p_%s.%s" % (GoType(a[1]), GoType(a[2]))
+  if h == "FN":
+    z = "func("  
+    args = a[1]
+    rets = a[2]
+    for i, comma, name, typ in Twosies(args):
+      z += "%s %s %s" % (comma, name, GoType(typ))
+    z += ")("
+    for i, comma, name, typ in Twosies(rets):
+      z += "%s %s %s" % (comma, name, GoType(typ))
+    z += ") "
+    return z
+
+NextTmp = 100
+def NewTmp(prefix):
+  global NextTmp
+  NextTmp += 1
+  return "%s_%d" % (prefix, NextTmp)
+
+LaterStuff = "// Later\n"
+def EmitLater(s):
+  global LaterStuff
+  LaterStuff += "\n" + s + "\n"
+
+class QuickValue(object):
+  def __init__(self, x):
+    self.x = x
+  def Value(self):
+    return self.x
+
+def AdaptArgToFn(a, d):
+  # Assuming it's a local function, taking Pobjs, returning Pobjs.
+  # i.e. Goify a Python Fn Value.
+  print "//## AdaptArgToFn %s %s" % (a, d)
+  args = d[1]
+  rets = d[2]
+  if rets:
+    raise Exception("rets not supported")
+
+  tmp = NewTmp("fn")
+  fn = "func %s(" % tmp
+
+  for i,comma,_,t in Twosies(args):
+    fn += "  %s arg%d %s  " % (comma, i, GoType(t))
+
+  fn += ") {\n"
+    
+  print "//##dump %s" % ast.dump(a)
+  fn += "  _ = %s (" % a.Value()
+
+  for i,comma,_,t in Twosies(args):
+    fn += "%s %s" % (comma, AdaptArgToDecl(QuickValue("arg%d"%i), t))
+
+  fn += ")\n"
+  fn += "}\n"
+
+  EmitLater(fn)
+
+  return tmp
+
+def AdaptArgToDecl(a, d):
+  print "//# AdaptArgToDecl( %s , %s )" % (a, d)
+  if d == 'Pobj':
+    return a.Value()
+  if IsPrimType(d):
+    d = d[1:] if d[0]=="'" else d
+    return "%s((%s).%s())" % (d, a.Value(), DEPRIM[d])
+  t = GoType(d)
+  if type(d) is list and d[0] == "FN":
+    return AdaptArgToFn(a, d)
+  return "(/*A*/(%s).(%s)/*Z*/)" % (a.Value(), t)
+
+def AdaptArgsToDecl(aa, fdecl):
+  print "//# AdaptArgsToDecl( %s , %s )" % (aa, fdecl)
+  dcls = fdecl[2] if fdecl[0] == "FUNC" else fdecl[3]
+  z = []
+  ellipsis = None
+  d = "?AdaptArgsToDecl?"
+  while aa:
+    aname = dcls[0]
+    d = dcls[1]
+    dcls = dcls[2:]
+    if type(d) is list and d[0] == "ELLIPSIS":
+      ellipsis = d[1]
+      break
+    a = aa[0]
+    aa = aa[1:]
+    z.append(AdaptArgToDecl(a, d))
+
+  if ellipsis:
+    for a in aa:
+      z.append(AdaptArgToDecl(a, ellipsis))
+    
+  print "//# AdaptArgsToDecl -> %s" % (z,)
+  return z
+
 @V
 def VCall(p):
-  aa = ','.join([x.Value() for x in p.args]) if p.args else ''
+  # aa = ','.join([x.Value() for x in p.args]) if p.args else ''
+  aa = p.args
 
   # Try to turn fval into package & func name.
   fval = p.func.Value()
@@ -121,24 +279,36 @@ def VCall(p):
     if fpkg[:2] == 'p_':
       fpkg = fpkg[2:]
     fname = fvec[-1]
-    print " # fval %s fvec %s fpkg %s fname %s" % (fval, fvec, fpkg, fname)
+    print "//# fval %s fvec %s fpkg %s fname %s" % (fval, fvec, fpkg, fname)
 
     imp = Imports.get(fpkg)
-    grok = Grok.get(fpkg)
+    grok = Grok.get(imp.replace('.', '/'))
     if imp and grok:
       fdecl = grok.get(fname)
       if fdecl:
-        print " # fdecl %s" % (fdecl, )
+        print "//# fdecl %s" % (fdecl, )
+    else:
+      print "//# imp %s grok %s" % (imp, grok)
+      print "//# " + repr(Grok.keys())
+      print "//# " + repr(Imports)
+  else:
+    # Dumb assumption: local function has as many args
+    # as given, and returns 1 result.
+    print "//# fval %s fvec (len=1)" % (fval,)
+    fdecl = ['FUNC', '?FUNC?', (2*len(aa)) * ['Pobj'], ['Pobj']]
+    
+  aa = AdaptArgsToDecl(aa, fdecl)
 
-  return '( %s ( %s ))' % (fval, aa)
+  aaa = ','.join(aa) if aa else ''
+  return '( %s ( %s ))' % (fval, aaa)
 
 @V
 def VNum(p):
-  return 'Pint(%d)' % p.n  # TODO: Pfloat, Plong.
+  return 'Pobj(Pint(%d))' % p.n  # TODO: Pfloat, Plong.
 
 @V
 def VStr(p):
-  return "Pstr(`%s`)" % (p.s)  # TODO: handle ` inside literal string.
+  return "Pobj(Pstr(`%s`))" % (p.s)  # TODO: handle ` inside literal string.
 
 @T
 def TPrint(p):
@@ -159,9 +329,9 @@ def VAttribute(p):
   else:
     return '(%s).%s' % (p.value.Value(), p.attr)
 
-@V
-def VIndex(p):
-  return p.value.Value()
+#@V
+#def VIndex(p):
+#  return p.value.Value()
 
 @V
 def VName(p):
@@ -265,3 +435,4 @@ def LoadGrok(fname):
 if __name__ == '__main__':
   LoadGrok("_grok.txt")
   Translate(sys.argv[1])
+  print LaterStuff
